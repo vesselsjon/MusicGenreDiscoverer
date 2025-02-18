@@ -1,4 +1,5 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
+import { MusicGenreDiscovererService } from './services/music-genre-discoverer.service';
 
 @Component({
   selector: 'app-root',
@@ -6,6 +7,18 @@ import { Component } from '@angular/core';
   standalone: false,
   styleUrl: './app.component.scss'
 })
-export class AppComponent {
+export class AppComponent implements OnInit {
   title = 'client';
+
+  constructor(private musicGenreDiscovererService: MusicGenreDiscovererService) {}
+
+  public ngOnInit(): void {
+    this.musicGenreDiscovererService.GetData().subscribe({
+      next: (data) => {
+        console.log(data)
+      }, error: (err) => {
+        console.error(err);
+      }
+    });
+  }
 }
