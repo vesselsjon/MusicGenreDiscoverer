@@ -10,7 +10,7 @@ export class MusicGenreDiscovererService {
     private _apiUrl: string;
 
     constructor(private http: HttpClient, @Inject('BASE_URL') baseUrl: string) {
-        this._apiUrl = Location.joinWithSlash(baseUrl, '/api');
+        this._apiUrl = Location.joinWithSlash(baseUrl, '/MusicGenreDiscoverer');
     }
 
     public GetData(): Observable<Object> {
