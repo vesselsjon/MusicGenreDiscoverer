@@ -13,7 +13,8 @@ export class MusicGenreDiscovererService {
         this._apiUrl = Location.joinWithSlash(baseUrl, '/MusicGenreDiscoverer');
     }
 
-    public GetData(): Observable<Object> {
-        return this.http.get(Location.joinWithSlash(this._apiUrl, 'users')) as Observable<Object>;
+    public GetRecommendations(userId: number, n: number = 10): Observable<any> {
+        const params = { user_id: userId.toString(), n: n.toString() };
+        return this.http.get(Location.joinWithSlash(this._apiUrl, 'recommendations'), { params }) as Observable<any>;
     }
 }

@@ -9,14 +9,18 @@ import { MusicGenreDiscovererService } from './services/music-genre-discoverer.s
 })
 export class AppComponent implements OnInit {
   title = 'client';
+  recommendations: any[] = [];
 
   constructor(private musicGenreDiscovererService: MusicGenreDiscovererService) {}
 
   public ngOnInit(): void {
-    this.musicGenreDiscovererService.GetData().subscribe({
+    const userId = 2;  // Example user ID, you can get it dynamically
+    this.musicGenreDiscovererService.GetRecommendations(userId).subscribe({
       next: (data) => {
-        console.log(data)
-      }, error: (err) => {
+        this.recommendations = data;
+        console.log(this.recommendations);
+      },
+      error: (err) => {
         console.error(err);
       }
     });
