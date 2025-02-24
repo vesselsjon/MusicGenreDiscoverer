@@ -27,11 +27,14 @@ recommender.fit(user_artists)
 
 @app.route("/MusicGenreDiscoverer/recommendations", methods=["GET"])
 def get_recommendations():
-    user_id = int(request.args.get("user_id"))  # Get user ID from query params
-    n = int(request.args.get("n", 10))  # Default to 10 recommendations
+    # Get user ID and number of recommendations from query params
+    user_id = int(request.args.get("user_id"))
+    n = int(request.args.get("n", 10))
     artists, scores = recommender.recommend(user_id, user_artists, n)
-    recommendations = [{"artist": artist, "score": score} for artist, score in zip(artists, scores)]
+
+    recommendations = [{"artist": artist, "score": float(score)} for artist, score in zip(artists, scores)]
     return jsonify(recommendations)
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=8080)

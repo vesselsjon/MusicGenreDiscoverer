@@ -14,7 +14,7 @@ export class MusicGenreDiscovererService {
     }
 
     public GetRecommendations(userId: number, n: number = 10): Observable<any> {
-        const params = { user_id: userId.toString(), n: n.toString() };
+        const params = { user_id: userId, n: n };
         return this.http.get(Location.joinWithSlash(this._apiUrl, 'recommendations'), { params }) as Observable<any>;
     }
 }
