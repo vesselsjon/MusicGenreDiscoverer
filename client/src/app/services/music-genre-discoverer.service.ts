@@ -17,4 +17,8 @@ export class MusicGenreDiscovererService {
         const params = { user_id: userId, n: n };
         return this.http.get(Location.joinWithSlash(this._apiUrl, 'recommendations'), { params }) as Observable<any>;
     }
+
+    public Upload(formData: FormData): Observable<any> {
+        return this.http.post(Location.joinWithSlash(this._apiUrl, 'upload'), formData) as Observable<any>;
+    }
 }

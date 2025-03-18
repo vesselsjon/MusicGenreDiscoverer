@@ -14,15 +14,15 @@ export class AppComponent implements OnInit {
   constructor(private musicGenreDiscovererService: MusicGenreDiscovererService) {}
 
   public ngOnInit(): void {
-    const userId = 2;  // Example user ID, you can get it dynamically
-    this.musicGenreDiscovererService.GetRecommendations(userId, 5).subscribe({
-      next: (data) => {
-        this.recommendations = data;
-        console.log(this.recommendations);
-      },
-      error: (err) => {
-        console.error(err);
-      }
-    });
+    // const userId = 2;  // Example user ID, you can get it dynamically
+    // this.musicGenreDiscovererService.GetRecommendations(userId, 5).subscribe({
+    //   next: (data) => {
+    //     this.recommendations = data;
+    //     console.log(this.recommendations);
+    //   },
+    //   error: (err) => {
+    //     console.error(err);
+    //   }
+    // });
   }
 }

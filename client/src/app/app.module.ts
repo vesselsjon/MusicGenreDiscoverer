@@ -6,11 +6,13 @@ import { MaterialModule } from './material.module';
 import { provideHttpClient } from '@angular/common/http';
 import { HeaderComponent } from './header/header.component';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
+import { UploadComponent } from './upload/upload.component';
 
 @NgModule({
   declarations: [
     AppComponent,
-    HeaderComponent
+    HeaderComponent,
+    UploadComponent
   ],
   imports: [
     AppRoutingModule,

@@ -1,40 +1,81 @@
+import librosa
+import numpy as np
+import os
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from pathlib import Path
-import implicit
-import numpy as np
-from musiccollaborativefiltering.data import load_user_artists, ArtistRetriever
-from musiccollaborativefiltering.recommender import ImplicitRecommender
+from pydub import AudioSegment
 
 app = Flask(__name__)
 cors = CORS(app, origins='*')
 
-# Initialize artist retriever
-artist_retriever = ArtistRetriever()
-artist_retriever.load_artists(Path("hetrec2011-lastfm-2k/artists.dat"))
+UPLOAD_FOLDER = 'uploads'
+ALLOWED_EXTENSIONS = {'mp3', 'wav', 'flac'}
 
-# Load user artists matrix
-user_artists = load_user_artists(Path("hetrec2011-lastfm-2k/user_artists.dat"))
+# Create uploads folder if it doesn't exist
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
 
-# Instantiate the ALS model using implicit
-implicit_model = implicit.als.AlternatingLeastSquares(
-    factors=50, iterations=10, regularization=0.01
-)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Instantiate recommender
-recommender = ImplicitRecommender(artist_retriever, implicit_model)
-recommender.fit(user_artists)
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-@app.route("/MusicGenreDiscoverer/recommendations", methods=["GET"])
-def get_recommendations():
-    # Get user ID and number of recommendations from query params
-    user_id = int(request.args.get("user_id"))
-    n = int(request.args.get("n", 10))
-    artists, scores = recommender.recommend(user_id, user_artists, n)
+@app.route("/MusicGenreDiscoverer/upload", methods=["POST"])
+def upload_file():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    
+    file = request.files['file']
+    
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+    
+    if file and allowed_file(file.filename):
+        filename = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+        file.save(filename)
 
-    recommendations = [{"artist": artist, "score": float(score)} for artist, score in zip(artists, scores)]
-    return jsonify(recommendations)
+        # Extract features from the audio file
+        features = extract_features(filename)
 
+        # Here you would perform classification and recommendations
+        recommendations = get_recommendations(features)
+
+        return jsonify(recommendations)
+    
+    return jsonify({"error": "Invalid file type"}), 400
+
+def extract_features(audio_file):
+    """
+    Function to extract features from the audio file using librosa and pydub.
+    This is a basic example, you can extend it to extract more features like MFCC, Spectrogram, etc.
+    """
+    # Load the audio file using librosa
+    y, sr = librosa.load(audio_file, sr=None)
+
+    # Extract some basic features
+    tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+    chroma = librosa.feature.chroma_stft(y=y, sr=sr)
+    mfcc = librosa.feature.mfcc(y=y, sr=sr)
+
+    # Example: Combine some features
+    feature_vector = np.mean(mfcc, axis=1)  # Mean MFCC over time
+    feature_vector = np.append(feature_vector, tempo)  # Add tempo as a feature
+    feature_vector = np.append(feature_vector, np.mean(chroma, axis=1))  # Mean chroma
+
+    return feature_vector.tolist()
+
+def get_recommendations(features):
+    """
+    Placeholder for your content-based recommendation logic.
+    In this example, you will classify the genre based on features and return similar tracks.
+    """
+    # For now, return dummy recommendations (you would plug in your actual ML model here)
+    recommendations = [
+        {"artist": "Artist 1", "genre": "Pop", "score": 0.95},
+        {"artist": "Artist 2", "genre": "Pop", "score": 0.89},
+        {"artist": "Artist 3", "genre": "Rock", "score": 0.85}
+    ]
+    return recommendations
 
 if __name__ == "__main__":
     app.run(debug=True, port=8080)

@@ -1,0 +1,13 @@
+<div class="upload-container">
+    <h2>Upload a Song</h2>
+    <input type="file" (change)="onFileUpload($event)" />
+    <button (click)="submitFile()">Submit</button>
+</div>
+<div *ngIf="recommendations?.length">
+    <h3>Recommended Songs</h3>
+    <ul>
+        <li *ngFor="let recommendation of recommendations">
+            {{ recommendation.artist }} - {{ recommendation.genre }}
+        </li>
+    </ul>
+</div>
