@@ -1,13 +1,67 @@
 .upload-container {
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
     padding: 20px;
     text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
 }
 
-ul {
+.upload-container mat-card-header {
+    background-color: #2196f3;
+    color: white;
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+.upload-container mat-card-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.upload-area {
+    padding: 40px 20px;
+    border: 2px dashed #2196f3;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    margin-bottom: 20px;
+}
+
+.upload-area:hover {
+    background-color: #f1f1f1;
+}
+
+.upload-area span {
+    font-size: 1rem;
+    color: #757575;
+}
+
+mat-spinner {
+    margin-top: 20px;
+}
+
+.recommendations-list {
+    margin-top: 20px;
+    padding: 10px;
+    background-color: #f5f5f5;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    color: #000000;
+}
+
+.recommendations-list ul {
     list-style-type: none;
     padding: 0;
 }
 
-li {
+.recommendations-list li {
     margin: 10px 0;
+}
+
+.recommendations-list span {
+    font-weight: bold;
+    color: #2196f3;
 }

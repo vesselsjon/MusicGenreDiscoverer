@@ -1,13 +1,24 @@
-<div class="upload-container">
-    <h2>Upload a Song</h2>
-    <input type="file" (change)="onFileUpload($event)" />
-    <button (click)="submitFile()">Submit</button>
-</div>
-<div *ngIf="recommendations?.length">
-    <h3>Recommended Songs</h3>
-    <ul>
-        <li *ngFor="let recommendation of recommendations">
-            {{ recommendation.artist }} - {{ recommendation.genre }}
-        </li>
-    </ul>
-</div>
+<mat-card class="upload-container">
+    <mat-card-header>
+        <mat-card-title>Upload Your Song</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+        <div class="upload-area">
+            <input type="file" (change)="OnFileUpload($event)" accept=".mp3, .wav" id="file-upload" hidden #fileInput />
+            <div class="file-drop-area" (click)="fileInput.click()">
+                <span *ngIf="!IsUploading">Drag and drop your file here, or click to select</span>
+                <span *ngIf="IsUploading">Uploading... Please wait.</span>
+            </div>
+        </div>
+        <mat-spinner *ngIf="IsUploading" diameter="50"></mat-spinner>
+
+        <div *ngIf="Recommendations.length > 0" class="recommendations-list">
+            <h3>Recommended Tracks:</h3>
+            <ul>
+                <li *ngFor="let recommendation of Recommendations">
+                    <span>{{ recommendation.artist }}</span> - <span>{{ recommendation.score | number: '1.2-2' }}</span>
+                </li>
+            </ul>
+        </div>
+    </mat-card-content>
+</mat-card>

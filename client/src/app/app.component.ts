@@ -1,5 +1,4 @@
-import { Component, OnInit } from '@angular/core';
-import { MusicGenreDiscovererService } from './services/music-genre-discoverer.service';
+import { Component } from '@angular/core';
 
 @Component({
   selector: 'app-root',
@@ -7,22 +6,28 @@ import { MusicGenreDiscovererService } from './services/music-genre-discoverer.s
   standalone: false,
   styleUrl: './app.component.scss'
 })
-export class AppComponent implements OnInit {
-  title = 'client';
-  recommendations: any[] = [];
+export class AppComponent {
+  //#region Inputs, Outputs, ViewChilds
+  //#endregion Inputs, Outputs, ViewChilds
 
-  constructor(private musicGenreDiscovererService: MusicGenreDiscovererService) {}
+  //#region Public Variables
+  //#endregion Public Variables
 
-  public ngOnInit(): void {
-    // const userId = 2;  // Example user ID, you can get it dynamically
-    // this.musicGenreDiscovererService.GetRecommendations(userId, 5).subscribe({
-    //   next: (data) => {
-    //     this.recommendations = data;
-    //     console.log(this.recommendations);
-    //   },
-    //   error: (err) => {
-    //     console.error(err);
-    //   }
-    // });
-  }
+  //#region Private Variables
+  //#endregion Private Variables
+
+  //#region Properties
+  //#endregion Properties
+
+  //#region Constructor and Angular Life Cycle
+  //#endregion Constructor and Angular Life Cycle
+
+  //#region Event Handlers
+  //#endregion Event Handlers
+
+  //#region Public Methods
+  //#endregion Public Methods
+
+  //#region Private Methods
+  //#endregion Private Methods
 }

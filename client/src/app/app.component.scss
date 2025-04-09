@@ -1,0 +1,26 @@
+/* Global styles for the entire app */
+body {
+    font-family: 'Roboto', sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f4f4;
+}
+
+app-header {
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    width: 100%;
+}
+
+app-upload {
+    width: 100%;
+    max-width: 600px;
+    margin-bottom: 40px;
+}

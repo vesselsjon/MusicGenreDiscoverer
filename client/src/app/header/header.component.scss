@@ -1,3 +1,28 @@
+mat-toolbar {
+    background-color: #2196f3;
+    color: white;
+    padding: 0 20px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.example-icon {
+    color: white;
+}
+
+.favorite-icon {
+    color: #f44336;
+}
+
+mat-icon {
+    font-size: 24px;
+}
+
 .example-spacer {
     flex: 1 1 auto;
+}
+
+mat-toolbar span {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-left: 10px;
 }
