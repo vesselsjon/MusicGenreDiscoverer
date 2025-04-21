@@ -1,32 +1,40 @@
+import os
 import librosa
 import numpy as np
-import os
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from pydub import AudioSegment
+from sklearn.metrics.pairwise import cosine_similarity
 
+import firebase_admin
+from firebase_admin import credentials, firestore
+
+# Flask setup
 app = Flask(__name__)
-cors = CORS(app, origins='*')
+CORS(app, origins='*')
 
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'mp3', 'wav', 'flac'}
 
-# Create uploads folder if it doesn't exist
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
-
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+# Firebase setup
+cred = credentials.Certificate("path/to/serviceAccountKey.json")  # <-- replace with your path
+firebase_admin.initialize_app(cred)
+db = firestore.client()
+
+# Utils
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+# API Endpoint
 @app.route("/MusicGenreDiscoverer/upload", methods=["POST"])
 def upload_file():
     if 'file' not in request.files:
         return jsonify({"error": "No file part"}), 400
     
     file = request.files['file']
-    
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
     
@@ -34,47 +42,70 @@ def upload_file():
         filename = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
         file.save(filename)
 
-        # Extract features from the audio file
+        # Extract audio features
         features = extract_features(filename)
 
-        # Here you would perform classification and recommendations
-        recommendations = get_recommendations(features)
+        # Optionally save this song in Firestore
+        db.collection('songs').add({
+            "song_name": file.filename,
+            "artist": "Uploaded by User",
+            "features": features
+        })
 
+        # Fetch all existing songs in Firestore for similarity comparison
+        docs = db.collection('songs').stream()
+        database = []
+        database_features = []
+
+        for doc in docs:
+            data = doc.to_dict()
+            if "features" in data:
+                database.append({
+                    "song_name": data.get("song_name", "Unknown"),
+                    "artist": data.get("artist", "Unknown")
+                })
+                database_features.append(data["features"])
+
+        # Generate and return recommendations
+        recommendations = get_recommendations(features, database_features, database)
         return jsonify(recommendations)
     
     return jsonify({"error": "Invalid file type"}), 400
 
 def extract_features(audio_file):
-    """
-    Function to extract features from the audio file using librosa and pydub.
-    This is a basic example, you can extend it to extract more features like MFCC, Spectrogram, etc.
-    """
-    # Load the audio file using librosa
     y, sr = librosa.load(audio_file, sr=None)
 
-    # Extract some basic features
     tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
     chroma = librosa.feature.chroma_stft(y=y, sr=sr)
     mfcc = librosa.feature.mfcc(y=y, sr=sr)
+    spectral_centroid = librosa.feature.spectral_centroid(y=y, sr=sr)
+    spectral_rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr)
+    energy = librosa.feature.rms(y=y)
+    zcr = librosa.feature.zero_crossing_rate(y=y)
 
-    # Example: Combine some features
-    feature_vector = np.mean(mfcc, axis=1)  # Mean MFCC over time
-    feature_vector = np.append(feature_vector, tempo)  # Add tempo as a feature
-    feature_vector = np.append(feature_vector, np.mean(chroma, axis=1))  # Mean chroma
+    feature_vector = np.mean(mfcc, axis=1)
+    feature_vector = np.append(feature_vector, tempo)
+    feature_vector = np.append(feature_vector, np.mean(chroma, axis=1))
+    feature_vector = np.append(feature_vector, np.mean(spectral_centroid, axis=1))
+    feature_vector = np.append(feature_vector, np.mean(spectral_rolloff, axis=1))
+    feature_vector = np.append(feature_vector, np.mean(energy, axis=1))
+    feature_vector = np.append(feature_vector, np.mean(zcr, axis=1))
 
     return feature_vector.tolist()
 
-def get_recommendations(features):
-    """
-    Placeholder for your content-based recommendation logic.
-    In this example, you will classify the genre based on features and return similar tracks.
-    """
-    # For now, return dummy recommendations (you would plug in your actual ML model here)
-    recommendations = [
-        {"artist": "Artist 1", "genre": "Pop", "score": 0.95},
-        {"artist": "Artist 2", "genre": "Pop", "score": 0.89},
-        {"artist": "Artist 3", "genre": "Rock", "score": 0.85}
-    ]
+def get_recommendations(features, database_features, database):
+    similarity_scores = cosine_similarity([features], database_features)
+    sorted_indices = np.argsort(similarity_scores[0])[::-1]
+
+    recommendations = []
+    for idx in sorted_indices[:10]:
+        recommendations.append({
+            "song_id": idx,
+            "score": round(similarity_scores[0][idx], 3),
+            "song_name": database[idx]["song_name"],
+            "artist": database[idx]["artist"]
+        })
+
     return recommendations
 
 if __name__ == "__main__":
