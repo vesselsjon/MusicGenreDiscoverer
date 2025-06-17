@@ -12,8 +12,12 @@ export class UploadComponent {
   //#endregion Inputs, Outputs, ViewChilds
 
   //#region Public Variables
-  public Recommendations: any[] = [];
+  public Artist: string = '';
   public IsUploading: boolean = false;
+  public Recommendations: any[] = [];
+  public SelectedFile: File | null = null;
+  public SongName: string = '';
+  public YouTubeSearchUrl: string = '';
   //#endregion Public Variables
 
   //#region Private Variables
@@ -27,25 +31,37 @@ export class UploadComponent {
   //#endregion Constructor and Angular Life Cycle
 
   //#region Event Handlers
-  public OnFileUpload(event: any) {
-    const formData = new FormData();
-    formData.append('file', event.target.files[0]);
-
-    this.IsUploading = true;  // Show spinner
-    this.musicGenreDiscovererService.Upload(formData).subscribe({
-      next: (response) => {
-        this.IsUploading = false;
-        this.Recommendations = response;  // Show recommendations
-      },
-      error: (error) => {
-        this.IsUploading = false;
-        console.error('Error uploading file:', error);
-      }
-    });
+  public OnFileSelected(event: any) {
+    if (event.target.files.length > 0) {
+      this.SelectedFile = event.target.files[0];
+    }
   }
   //#endregion Event Handlers
 
   //#region Public Methods
+  public Submit() {
+    if (!this.SelectedFile) return;
+
+    const formData = new FormData();
+    formData.append('file', this.SelectedFile);
+    formData.append('song_name', this.SongName || this.SelectedFile.name);
+    formData.append('artist', this.Artist || 'Unknown Artist');
+
+    this.IsUploading = true;
+    this.musicGenreDiscovererService.Upload(formData).subscribe({
+      next: (response) => {
+        this.IsUploading = false;
+        this.Recommendations = response.map((rec: any) => ({
+          ...rec,
+          youtubeLink: `https://www.youtube.com/results?search_query=${encodeURIComponent(rec.song_name + ' ' + rec.artist)}`
+        }));
+      },
+      error: (error) => {
+        this.IsUploading = false;
+        console.error('Upload failed:', error);
+      }
+    });
+  }
   //#endregion Public Methods
 
   //#region Private Methods
