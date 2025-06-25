@@ -62,11 +62,46 @@ Install the following:
     ```bash
      pip install flask flask-cors numpy librosa scikit-learn firebase-admin
     ```
-4. Add you Firebase Admin SDK JSON as:
+4. Add your Firebase Admin SDK JSON as:
     ```bash
       ./musicgenrediscoverer-firebase-adminsdk.json
     ```
-5. Run Flask server:
+
+    To get this, go into the firebase project settings
+
+
+
+
+
+
+
+
+
+
+
+
+
+   ![image](https://github.com/user-attachments/assets/d7794a71-fa84-4674-b147-99d10358d5b8)
+
+   Then go to the service accounts tab and click generate new key. Once again this will go in the server folder under the name `./musicgenrediscoverer-firebase-adminsdk.json`
+
+
+
+
+
+
+
+
+
+
+
+
+
+   ![image](https://github.com/user-attachments/assets/09b6f388-d1b3-4952-b772-843d1cc6927c)
+
+
+    
+6. Run Flask server:
     ```bash
       python your_flask_file.py
     ```
