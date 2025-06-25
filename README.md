@@ -103,7 +103,7 @@ Install the following:
     
 6. Run Flask server:
     ```bash
-      python your_flask_file.py
+      python .\main.py
     ```
 The backend runs at: `http://localhost:8080`
 
@@ -134,3 +134,18 @@ You can open your browser at: `http://localhost:4200`
 3. Compares uploaded features with database songs using cosine similarity.
 4. Returns top 10 similar songs.
 5. Angular displays the results.
+
+---
+
+## Project Structure
+```bash
+musicgenrediscoverer/
+├── client/                        # Angular frontend project. This will include src folder where each component is held + angular & node_modules                    
+├── server/
+    ├── uploads                    # Created when ran for the first time
+    ├── venv
+    ├── generate_data.py           # Do not need to run this as this was used to backfill data
+    ├── main.py                    # Run this one via python .\main.py command
+    └── musicgenrediscoverer-firebase-adminsdk.json
+└── README/               
+```
