@@ -1,18 +1,22 @@
-<mat-card class="upload-container">
+<mat-card class="upload-container glass-card">
     <mat-card-header>
-        <mat-card-title>Upload Your Song</mat-card-title>
+        <mat-card-title>🎵 Upload Your Song</mat-card-title>
     </mat-card-header>
+
     <mat-card-content>
-        <div class="upload-area">
+        <div class="upload-area" (click)="fileInput.click()">
             <input type="file" (change)="OnFileSelected($event)" accept=".mp3, .wav, .ogg" id="file-upload" hidden
                 #fileInput />
-            <div class="file-drop-area" (click)="fileInput.click()">
-                <span *ngIf="!IsUploading">Drag and drop your file here, or click to select</span>
-                <span *ngIf="IsUploading">Uploading... Please wait.</span>
+            <div class="file-drop-area">
+                <ng-container *ngIf="!IsUploading">
+                    <span *ngIf="!SelectedFile">📁 Drag & drop your file, or click to select</span>
+                    <span *ngIf="SelectedFile">✅ {{ SelectedFile.name }}</span>
+                </ng-container>
+                <span *ngIf="IsUploading">⏳ Uploading... Please wait.</span>
             </div>
         </div>
 
-        <div class="input-fields" *ngIf="SelectedFile">
+        <div class="input-fields fade-in" *ngIf="SelectedFile">
             <mat-form-field appearance="fill">
                 <mat-label>Song Title</mat-label>
                 <input matInput [(ngModel)]="SongName" placeholder="e.g., Bohemian Rhapsody" />
@@ -28,18 +32,15 @@
 
         <mat-spinner *ngIf="IsUploading" diameter="50"></mat-spinner>
 
-        <div *ngIf="Recommendations.length > 0" class="recommendations-list">
-            <h3>Recommended Tracks:</h3>
-            <ul>
-                <li *ngFor="let recommendation of Recommendations">
-                    <strong>{{ recommendation.song_name }}</strong> by {{ recommendation.artist }}
-                    <!-- <em>— {{ recommendation.score | number: '1.2-2' }}</em> --> <!-- Use to show recommendation score -->
-                    <a [href]="recommendation.youtubeLink" target="_blank" rel="noopener noreferrer"
-                        style="margin-left: 10px;">
-                        🔗 {{ recommendation.song_name }}
-                    </a>
-                </li>
-            </ul>
+        <div *ngIf="Recommendations.length > 0" class="recommendations-list fade-in">
+            <h3>🔥 Recommended Tracks</h3>
+            <div class="recommendation-card" *ngFor="let recommendation of Recommendations">
+                <strong>{{ recommendation.song_name }}</strong> by {{ recommendation.artist }}
+                <br />
+                <a [href]="recommendation.youtubeLink" target="_blank" rel="noopener noreferrer">
+                    ▶️ Watch on YouTube
+                </a>
+            </div>
         </div>
     </mat-card-content>
 </mat-card>

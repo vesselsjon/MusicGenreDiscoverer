@@ -1,4 +1,5 @@
 import os
+import hashlib
 import numpy as np
 import librosa
 from flask import Flask, request, jsonify
@@ -30,6 +31,15 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def get_file_hash(filepath):
+    """Generate SHA-256 hash of the audio file contents."""
+    hasher = hashlib.sha256()
+    with open(filepath, 'rb') as f:
+        buf = f.read()
+        hasher.update(buf)
+    return hasher.hexdigest()
+
+
 @app.route("/MusicGenreDiscoverer/upload", methods=["POST"])
 def upload_file():
     if 'file' not in request.files:
@@ -46,15 +56,18 @@ def upload_file():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
         file.save(filepath)
 
-        # Check if song already exists (by filename)
-        existing_docs = songs_collection.where("filename", "==", file.filename).stream()
+        file_hash = get_file_hash(filepath)
+
+        # Check if song already exists using file hash
+        existing_docs = songs_collection.where("file_hash", "==", file_hash).stream()
         if any(existing_docs):
-            print(f"[INFO] Song '{file.filename}' already exists in Firestore.")
+            print(f"[INFO] Song '{file.filename}' already exists (hash match).")
         else:
             print(f"[INFO] New song '{file.filename}'. Extracting features and uploading to Firestore.")
             features = extract_features(filepath)
             songs_collection.add({
                 "filename": file.filename,
+                "file_hash": file_hash,
                 "features": features,
                 "artist": artist,
                 "song_name": song_name
@@ -63,11 +76,10 @@ def upload_file():
         # Fetch database songs and features
         database, database_features = fetch_songs_from_firestore()
 
-        # Extract features for uploaded file again (for recommendation)
+        # Extract features again for recommendation
         upload_features = extract_features(filepath)
 
-        # Get recommendations with normalization
-        recommendations = get_recommendations(upload_features, database_features, database, exclude_filename=file.filename)
+        recommendations = get_recommendations(upload_features, database_features, database, exclude_hash=file_hash)
 
         return jsonify(recommendations)
 
@@ -108,10 +120,8 @@ def fetch_songs_from_firestore():
     return database, features
 
 
-def get_recommendations(upload_features, db_features, db_songs, exclude_filename=None):
-    # Combine features for normalization
+def get_recommendations(upload_features, db_features, db_songs, exclude_hash=None):
     all_features = np.vstack([upload_features] + db_features)
-
     scaler = StandardScaler()
     all_features_norm = scaler.fit_transform(all_features)
 
@@ -119,20 +129,12 @@ def get_recommendations(upload_features, db_features, db_songs, exclude_filename
     db_norm = all_features_norm[1:]
 
     similarity_scores = cosine_similarity(upload_norm, db_norm)[0]
-
-    # Debug: print similarity scores
-    print("[DEBUG] Similarity scores with all songs:")
-    for idx, score in enumerate(similarity_scores):
-        print(f"  {idx:04d}: {db_songs[idx].get('song_name', 'Unknown')} — score = {score:.6f}")
-
-    # Sort by similarity descending
     sorted_indices = np.argsort(similarity_scores)[::-1]
 
     recommendations = []
     for idx in sorted_indices:
         db_song = db_songs[idx]
-        if exclude_filename and db_song.get("filename") == exclude_filename:
-            print(f"[DEBUG] Skipping self: {db_song.get('song_name')} (filename matched)")
+        if exclude_hash and db_song.get("file_hash") == exclude_hash:
             continue
         recommendations.append({
             "song_name": db_song.get("song_name", f"Song {idx}"),
@@ -142,7 +144,6 @@ def get_recommendations(upload_features, db_features, db_songs, exclude_filename
         if len(recommendations) >= 10:
             break
 
-    print(f"[DEBUG] Top {len(recommendations)} recommendations computed.\n")
     return recommendations
 
 
