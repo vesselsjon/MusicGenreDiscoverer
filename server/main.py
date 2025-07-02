@@ -21,7 +21,7 @@ if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 # Initialize Firebase
-cred = credentials.Certificate(r'./musicgenrediscoverer-firebase-adminsdk.json')
+cred = credentials.Certificate(r'firebase-adminsdk.json')
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 songs_collection = db.collection('songs')
@@ -146,6 +146,11 @@ def get_recommendations(upload_features, db_features, db_songs, exclude_hash=Non
 
     return recommendations
 
-
+'''
 if __name__ == "__main__":
     app.run(debug=True, port=8080)
+'''
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+
