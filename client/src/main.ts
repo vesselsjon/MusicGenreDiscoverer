@@ -10,7 +10,7 @@ export function getBaseUrl(): string {
     baseUrl = 'http://localhost:8080/';
   }
 
-  return baseUrl;
+  return 'https://musicgenrediscoverer.onrender.com/';
 }
 
 const providers: any = [
