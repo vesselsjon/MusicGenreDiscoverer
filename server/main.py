@@ -9,10 +9,13 @@ from sklearn.preprocessing import StandardScaler
 import firebase_admin
 from firebase_admin import credentials, firestore
 import psutil
-import resampy  # lighter and faster than librosa.resample
+import resampy
 
-# --- Numba/Librosa Memory Optimization ---
+# --- Numba & Librosa Memory Optimization ---
 os.environ["NUMBA_CACHE_DIR"] = "/tmp/numba_cache"
+import numba
+numba.config.CACHE_DIR = "/tmp/numba_cache"
+numba.set_num_threads(1)
 
 # --- Flask App Setup ---
 app = Flask(__name__)
@@ -57,19 +60,17 @@ def load_audio_trimmed(filepath, duration=10, sr=22050):
 
 # --- Feature Extraction ---
 def extract_features(audio_file):
-    import librosa  # Delay import to avoid loading unless needed
+    import librosa  # Delayed import to save RAM
     y, sr = load_audio_trimmed(audio_file, duration=10)
     log_memory("During audio load")
 
     try:
         tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
         mfcc = librosa.feature.mfcc(y=y, sr=sr)
-        chroma = librosa.feature.chroma_stft(y=y, sr=sr)
 
-        # Reduced feature set to avoid memory overload
+        # Reduced feature set for memory safety
         feature_vector = np.mean(mfcc, axis=1)
         feature_vector = np.append(feature_vector, tempo)
-        feature_vector = np.append(feature_vector, np.mean(chroma, axis=1))
 
         return feature_vector.tolist()
     except Exception as e:
@@ -134,10 +135,14 @@ def upload_file():
         file.save(filepath)
         log_memory("After File Save")
 
+        # Reject oversized files
+        if os.path.getsize(filepath) > 5 * 1024 * 1024:  # 5MB limit
+            return jsonify({"error": "File too large. Max size is 5MB."}), 400
+
         file_hash = get_file_hash(filepath)
 
         try:
-            existing_docs = list(songs_collection.where("file_hash", "==", file_hash).stream())
+            existing_docs = list(songs_collection.where(filter=("file_hash", "==", file_hash)).stream())
         except Exception as e:
             return jsonify({"error": f"Firestore error: {str(e)}"}), 500
 
