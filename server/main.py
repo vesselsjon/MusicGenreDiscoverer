@@ -8,6 +8,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import StandardScaler
 import firebase_admin
 from firebase_admin import credentials, firestore
+import psutil
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -29,10 +30,14 @@ firebase_admin.initialize_app(cred)
 db = firestore.client()
 songs_collection = db.collection('songs')
 
+# Memory logging utility
+def log_memory_usage(stage=""):
+    process = psutil.Process(os.getpid())
+    mem_mb = process.memory_info().rss / 1024 / 1024
+    print(f"[MEMORY] {stage}: {mem_mb:.2f} MB")
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
 
 def get_file_hash(filepath):
     """Generate SHA-256 hash of the audio file contents."""
@@ -42,9 +47,10 @@ def get_file_hash(filepath):
         hasher.update(buf)
     return hasher.hexdigest()
 
-
 @app.route("/MusicGenreDiscoverer/upload", methods=["POST"])
 def upload_file():
+    log_memory_usage("Start Upload")
+
     if 'file' not in request.files:
         return jsonify({"error": "No file part"}), 400
 
@@ -58,6 +64,7 @@ def upload_file():
     if file and allowed_file(file.filename):
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
         file.save(filepath)
+        log_memory_usage("After File Save")
 
         file_hash = get_file_hash(filepath)
 
@@ -68,6 +75,8 @@ def upload_file():
         else:
             print(f"[INFO] New song '{file.filename}'. Extracting features and uploading to Firestore.")
             features = extract_features(filepath)
+            log_memory_usage("After Feature Extraction")
+
             songs_collection.add({
                 "filename": file.filename,
                 "file_hash": file_hash,
@@ -78,19 +87,22 @@ def upload_file():
 
         # Fetch database songs and features
         database, database_features = fetch_songs_from_firestore()
+        log_memory_usage("After Fetching Songs")
 
         # Extract features again for recommendation
         upload_features = extract_features(filepath)
+        log_memory_usage("After Upload Feature Extraction")
 
         recommendations = get_recommendations(upload_features, database_features, database, exclude_hash=file_hash)
+        log_memory_usage("After Recommendations")
 
         return jsonify(recommendations)
 
     return jsonify({"error": "Invalid file type"}), 400
 
-
 def extract_features(audio_file):
     y, sr = librosa.load(audio_file, sr=None)
+    log_memory_usage("During librosa.load")
 
     tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
     chroma = librosa.feature.chroma_stft(y=y, sr=sr)
@@ -110,7 +122,6 @@ def extract_features(audio_file):
 
     return feature_vector.tolist()
 
-
 def fetch_songs_from_firestore():
     songs = songs_collection.stream()
     database = []
@@ -121,7 +132,6 @@ def fetch_songs_from_firestore():
             features.append(data["features"])
             database.append(data)
     return database, features
-
 
 def get_recommendations(upload_features, db_features, db_songs, exclude_hash=None):
     all_features = np.vstack([upload_features] + db_features)
@@ -149,11 +159,5 @@ def get_recommendations(upload_features, db_features, db_songs, exclude_hash=Non
 
     return recommendations
 
-'''
-if __name__ == "__main__":
-    app.run(debug=True, port=8080)
-'''
-
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
-
