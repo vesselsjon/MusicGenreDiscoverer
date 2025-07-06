@@ -1,7 +1,6 @@
 import os
 import hashlib
 import numpy as np
-import librosa
 import soundfile as sf
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -10,6 +9,10 @@ from sklearn.preprocessing import StandardScaler
 import firebase_admin
 from firebase_admin import credentials, firestore
 import psutil
+import resampy  # lighter and faster than librosa.resample
+
+# --- Numba/Librosa Memory Optimization ---
+os.environ["NUMBA_CACHE_DIR"] = "/tmp/numba_cache"
 
 # --- Flask App Setup ---
 app = Flask(__name__)
@@ -43,37 +46,35 @@ def get_file_hash(filepath):
         hasher.update(f.read())
     return hasher.hexdigest()
 
-def load_audio_trimmed(filepath, duration=30, sr=22050):
-    y, file_sr = sf.read(filepath)
-    if y.ndim > 1:  # Stereo to mono
+def load_audio_trimmed(filepath, duration=10, sr=22050):
+    y, file_sr = sf.read(filepath, always_2d=False)
+    if y.ndim > 1:
         y = y.mean(axis=1)
     if file_sr != sr:
-        y = librosa.resample(y, orig_sr=file_sr, target_sr=sr)
+        y = resampy.resample(y, file_sr, sr)
     y = y[:int(duration * sr)]
     return y, sr
 
 # --- Feature Extraction ---
 def extract_features(audio_file):
-    y, sr = load_audio_trimmed(audio_file, duration=30)
-    log_memory("During librosa.load")
+    import librosa  # Delay import to avoid loading unless needed
+    y, sr = load_audio_trimmed(audio_file, duration=10)
+    log_memory("During audio load")
 
-    tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-    chroma = librosa.feature.chroma_stft(y=y, sr=sr)
-    mfcc = librosa.feature.mfcc(y=y, sr=sr)
-    spectral_centroid = librosa.feature.spectral_centroid(y=y, sr=sr)
-    spectral_rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr)
-    energy = librosa.feature.rms(y=y)
-    zcr = librosa.feature.zero_crossing_rate(y=y)
+    try:
+        tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+        mfcc = librosa.feature.mfcc(y=y, sr=sr)
+        chroma = librosa.feature.chroma_stft(y=y, sr=sr)
 
-    feature_vector = np.mean(mfcc, axis=1)
-    feature_vector = np.append(feature_vector, tempo)
-    feature_vector = np.append(feature_vector, np.mean(chroma, axis=1))
-    feature_vector = np.append(feature_vector, np.mean(spectral_centroid, axis=1))
-    feature_vector = np.append(feature_vector, np.mean(spectral_rolloff, axis=1))
-    feature_vector = np.append(feature_vector, np.mean(energy, axis=1))
-    feature_vector = np.append(feature_vector, np.mean(zcr, axis=1))
+        # Reduced feature set to avoid memory overload
+        feature_vector = np.mean(mfcc, axis=1)
+        feature_vector = np.append(feature_vector, tempo)
+        feature_vector = np.append(feature_vector, np.mean(chroma, axis=1))
 
-    return feature_vector.tolist()
+        return feature_vector.tolist()
+    except Exception as e:
+        print(f"[ERROR] Feature extraction failed: {e}")
+        return []
 
 # --- Firestore Retrieval ---
 def fetch_songs_from_firestore():
@@ -88,6 +89,9 @@ def fetch_songs_from_firestore():
 
 # --- Recommendation Logic ---
 def get_recommendations(upload_features, db_features, db_songs, exclude_hash=None):
+    if not upload_features:
+        return []
+
     all_features = np.vstack([upload_features] + db_features)
     scaler = StandardScaler()
     all_features_norm = scaler.fit_transform(all_features)
@@ -132,14 +136,19 @@ def upload_file():
 
         file_hash = get_file_hash(filepath)
 
-        # Use positional args to avoid Firestore warning
-        existing_docs = list(songs_collection.where("file_hash", "==", file_hash).stream())
+        try:
+            existing_docs = list(songs_collection.where("file_hash", "==", file_hash).stream())
+        except Exception as e:
+            return jsonify({"error": f"Firestore error: {str(e)}"}), 500
+
         if existing_docs:
             print(f"[INFO] Song '{file.filename}' already exists (hash match).")
             upload_features = existing_docs[0].to_dict().get("features")
         else:
             print(f"[INFO] New song '{file.filename}'. Extracting features and uploading to Firestore.")
             upload_features = extract_features(filepath)
+            if not upload_features:
+                return jsonify({"error": "Feature extraction failed."}), 500
             songs_collection.add({
                 "filename": file.filename,
                 "file_hash": file_hash,
@@ -148,10 +157,7 @@ def upload_file():
                 "song_name": song_name
             })
 
-        log_memory("After Fetching Songs")
         database, database_features = fetch_songs_from_firestore()
-
-        log_memory("After Upload Feature Extraction")
         recommendations = get_recommendations(upload_features, database_features, database, exclude_hash=file_hash)
         log_memory("After Recommendations")
 
