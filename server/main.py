@@ -12,10 +12,7 @@ import psutil
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app, origins=[
-    "http://localhost:4200",
-    "https://musicgenrediscoverer-bcb61.web.app"
-])
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'mp3', 'wav', 'flac', 'ogg'}
