@@ -46,7 +46,7 @@ def get_file_hash(filepath):
         hasher.update(f.read())
     return hasher.hexdigest()
 
-def load_audio_trimmed(filepath, duration=10, sr=22050):
+def load_audio_trimmed(filepath, duration=5, sr=16000):
     y, file_sr = sf.read(filepath, always_2d=False)
     if y.ndim > 1:
         y = y.mean(axis=1)
@@ -57,7 +57,7 @@ def load_audio_trimmed(filepath, duration=10, sr=22050):
 
 # --- Feature Extraction ---
 def extract_features(audio_file):
-    import librosa  # Delay import to avoid loading unless needed
+    import librosa  
     y, sr = load_audio_trimmed(audio_file, duration=10)
     log_memory("During audio load")
 
