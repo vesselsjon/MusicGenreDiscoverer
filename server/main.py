@@ -2,6 +2,7 @@ import os
 import hashlib
 import numpy as np
 import librosa
+import psutil
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from sklearn.metrics.pairwise import cosine_similarity
@@ -9,13 +10,9 @@ from sklearn.preprocessing import StandardScaler
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-# Initialize Flask app
+# === Flask setup ===
 app = Flask(__name__)
-# Allow CORS for your frontends (change or add origins as needed)
-CORS(app, resources={r"/*": {"origins": [
-    "http://localhost:4200",
-    "https://musicgenrediscoverer-bcb61.web.app"
-]}})
+CORS(app, resources={r"/*": {"origins": "*"}})  
 
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'mp3', 'wav', 'flac', 'ogg'}
@@ -24,28 +21,33 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-# Initialize Firebase
-cred = credentials.Certificate(r'firebase-adminsdk.json')
+# === Firebase ===
+cred = credentials.Certificate('firebase-adminsdk.json')
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 songs_collection = db.collection('songs')
 
+# === Helpers ===
+
+def log_memory(tag=""):
+    mem = psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
+    print(f"[MEMORY] {tag}: {mem:.2f} MB")
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-
 def get_file_hash(filepath):
-    """Generate SHA-256 hash of the audio file contents."""
     hasher = hashlib.sha256()
     with open(filepath, 'rb') as f:
-        buf = f.read()
-        hasher.update(buf)
+        hasher.update(f.read())
     return hasher.hexdigest()
 
+# === Routes ===
 
 @app.route("/MusicGenreDiscoverer/upload", methods=["POST"])
 def upload_file():
+    log_memory("Start Upload")
+
     if 'file' not in request.files:
         return jsonify({"error": "No file part"}), 400
 
@@ -59,12 +61,13 @@ def upload_file():
     if file and allowed_file(file.filename):
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
         file.save(filepath)
+        log_memory("After File Save")
 
         file_hash = get_file_hash(filepath)
 
-        # Check if song already exists using file hash
-        existing_docs = songs_collection.where("file_hash", "==", file_hash).stream()
-        if any(existing_docs):
+        # Check Firestore for existing
+        existing_docs = list(songs_collection.where(filter=("file_hash", "==", file_hash)).stream())
+        if existing_docs:
             print(f"[INFO] Song '{file.filename}' already exists (hash match).")
         else:
             print(f"[INFO] New song '{file.filename}'. Extracting features and uploading to Firestore.")
@@ -77,41 +80,43 @@ def upload_file():
                 "song_name": song_name
             })
 
-        # Fetch database songs and features
+        log_memory("After Fetching Songs")
         database, database_features = fetch_songs_from_firestore()
 
-        # Extract features again for recommendation
         upload_features = extract_features(filepath)
+        log_memory("After Upload Feature Extraction")
 
         recommendations = get_recommendations(upload_features, database_features, database, exclude_hash=file_hash)
+        log_memory("After Recommendations")
 
         return jsonify(recommendations)
 
     return jsonify({"error": "Invalid file type"}), 400
 
+# === Feature extraction without numba ===
 
 def extract_features(audio_file):
-    # Memory optimized: Load only first 30 seconds at 22050 Hz sample rate
+    log_memory("During librosa.load")
     y, sr = librosa.load(audio_file, sr=22050, duration=30)
 
     tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
     chroma = librosa.feature.chroma_stft(y=y, sr=sr)
     mfcc = librosa.feature.mfcc(y=y, sr=sr)
-    spectral_centroid = librosa.feature.spectral_centroid(y=y, sr=sr)
-    spectral_rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr)
-    energy = librosa.feature.rms(y=y)
-    zcr = librosa.feature.zero_crossing_rate(y=y)
+
+    energy = np.mean(y ** 2) 
+    zcr = np.mean(np.abs(np.diff(np.sign(y)))) 
+    centroid = np.mean(np.abs(y)) 
+    rolloff = np.percentile(np.abs(y), 85)  
 
     feature_vector = np.mean(mfcc, axis=1)
     feature_vector = np.append(feature_vector, tempo)
     feature_vector = np.append(feature_vector, np.mean(chroma, axis=1))
-    feature_vector = np.append(feature_vector, np.mean(spectral_centroid, axis=1))
-    feature_vector = np.append(feature_vector, np.mean(spectral_rolloff, axis=1))
-    feature_vector = np.append(feature_vector, np.mean(energy, axis=1))
-    feature_vector = np.append(feature_vector, np.mean(zcr, axis=1))
+    feature_vector = np.append(feature_vector, centroid)
+    feature_vector = np.append(feature_vector, rolloff)
+    feature_vector = np.append(feature_vector, energy)
+    feature_vector = np.append(feature_vector, zcr)
 
     return feature_vector.tolist()
-
 
 def fetch_songs_from_firestore():
     songs = songs_collection.stream()
@@ -123,7 +128,6 @@ def fetch_songs_from_firestore():
             features.append(data["features"])
             database.append(data)
     return database, features
-
 
 def get_recommendations(upload_features, db_features, db_songs, exclude_hash=None):
     all_features = np.vstack([upload_features] + db_features)
@@ -151,6 +155,6 @@ def get_recommendations(upload_features, db_features, db_songs, exclude_hash=Non
 
     return recommendations
 
-
+# === Entrypoint ===
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
