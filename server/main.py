@@ -66,7 +66,7 @@ def upload_file():
         file_hash = get_file_hash(filepath)
 
         # Check Firestore for existing
-        existing_docs = list(songs_collection.where(filter=("file_hash", "==", file_hash)).stream())
+        existing_docs = list(songs_collection.where("file_hash", "==", file_hash).stream())
         if existing_docs:
             print(f"[INFO] Song '{file.filename}' already exists (hash match).")
         else:
