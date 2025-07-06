@@ -136,13 +136,14 @@ def upload_file():
         existing_docs = list(songs_collection.where("file_hash", "==", file_hash).stream())
         if existing_docs:
             print(f"[INFO] Song '{file.filename}' already exists (hash match).")
+            upload_features = existing_docs[0].to_dict().get("features")
         else:
             print(f"[INFO] New song '{file.filename}'. Extracting features and uploading to Firestore.")
-            features = extract_features(filepath)
+            upload_features = extract_features(filepath)
             songs_collection.add({
                 "filename": file.filename,
                 "file_hash": file_hash,
-                "features": features,
+                "features": upload_features,
                 "artist": artist,
                 "song_name": song_name
             })
@@ -150,9 +151,7 @@ def upload_file():
         log_memory("After Fetching Songs")
         database, database_features = fetch_songs_from_firestore()
 
-        upload_features = extract_features(filepath)
         log_memory("After Upload Feature Extraction")
-
         recommendations = get_recommendations(upload_features, database_features, database, exclude_hash=file_hash)
         log_memory("After Recommendations")
 
