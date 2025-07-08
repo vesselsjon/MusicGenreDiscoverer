@@ -26,7 +26,7 @@ if not os.path.exists(UPLOAD_FOLDER):
 cred = credentials.Certificate('firebase-adminsdk.json')
 firebase_admin.initialize_app(cred)
 db = firestore.client()
-songs_collection = db.collection('songs')
+songs_collection = db.collection('songs_production')
 
 # --- Memory Utility ---
 def log_memory(label):
