@@ -43,18 +43,17 @@ def get_file_hash(filepath):
         hasher.update(f.read())
     return hasher.hexdigest()
 
-def load_audio_trimmed(filepath, duration=30, sr=22050):
+def load_audio_full(filepath, sr=22050):
     y, file_sr = sf.read(filepath)
     if y.ndim > 1:  # Stereo to mono
         y = y.mean(axis=1)
     if file_sr != sr:
         y = librosa.resample(y, orig_sr=file_sr, target_sr=sr)
-    y = y[:int(duration * sr)]
     return y, sr
 
 # --- Feature Extraction ---
 def extract_features(audio_file):
-    y, sr = load_audio_trimmed(audio_file, duration=30)
+    y, sr = load_audio_full(audio_file)
     log_memory("During librosa.load")
 
     tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
@@ -132,7 +131,6 @@ def upload_file():
 
         file_hash = get_file_hash(filepath)
 
-        # Use positional args to avoid Firestore warning
         existing_docs = list(songs_collection.where("file_hash", "==", file_hash).stream())
         if existing_docs:
             print(f"[INFO] Song '{file.filename}' already exists (hash match).")

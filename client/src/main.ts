@@ -10,8 +10,7 @@ export function getBaseUrl(): string {
     baseUrl = 'http://localhost:8080/';
   }
 
-  // return 'https://musicgenrediscoverer.onrender.com/';
-  return 'https://musicgenrediscoverer-289068926690.us-east4.run.app';
+  return 'https://musicgenrediscoverer.onrender.com/';
 }
 
 const providers: any = [
