@@ -17,7 +17,7 @@ ALLOWED_EXTENSIONS = {'mp3', 'wav', 'flac', 'ogg'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-cred = credentials.Certificate('musicgenrediscoverer-firebase-adminsdk.json')
+cred = credentials.Certificate('firebase-adminsdk.json')
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 songs_collection = db.collection('songs_scratch')
