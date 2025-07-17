@@ -1,8 +1,5 @@
 import os
-import hashlib
 import numpy as np
-import librosa
-import soundfile as sf
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from sklearn.metrics.pairwise import cosine_similarity
@@ -10,71 +7,28 @@ from sklearn.preprocessing import StandardScaler
 import firebase_admin
 from firebase_admin import credentials, firestore
 import psutil
+from audio_utils.audio_utils import load_audio_full, extract_features, get_file_hash
 
-# --- Flask App Setup ---
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'mp3', 'wav', 'flac', 'ogg'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
-# --- Firebase Initialization ---
-cred = credentials.Certificate('firebase-adminsdk.json')
+cred = credentials.Certificate('musicgenrediscoverer-firebase-adminsdk.json')
 firebase_admin.initialize_app(cred)
 db = firestore.client()
-songs_collection = db.collection('songs_production')
+songs_collection = db.collection('songs_scratch')
 
-# --- Memory Utility ---
 def log_memory(label):
     mem = psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
     print(f"[MEMORY] {label}: {mem:.2f} MB")
 
-# --- Utility Functions ---
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def get_file_hash(filepath):
-    hasher = hashlib.sha256()
-    with open(filepath, 'rb') as f:
-        hasher.update(f.read())
-    return hasher.hexdigest()
-
-def load_audio_full(filepath, sr=22050):
-    y, file_sr = sf.read(filepath)
-    if y.ndim > 1:  # Stereo to mono
-        y = y.mean(axis=1)
-    if file_sr != sr:
-        y = librosa.resample(y, orig_sr=file_sr, target_sr=sr)
-    return y, sr
-
-# --- Feature Extraction ---
-def extract_features(audio_file):
-    y, sr = load_audio_full(audio_file)
-    log_memory("During librosa.load")
-
-    tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-    chroma = librosa.feature.chroma_stft(y=y, sr=sr)
-    mfcc = librosa.feature.mfcc(y=y, sr=sr)
-    spectral_centroid = librosa.feature.spectral_centroid(y=y, sr=sr)
-    spectral_rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr)
-    energy = librosa.feature.rms(y=y)
-    zcr = librosa.feature.zero_crossing_rate(y=y)
-
-    feature_vector = np.mean(mfcc, axis=1)
-    feature_vector = np.append(feature_vector, tempo)
-    feature_vector = np.append(feature_vector, np.mean(chroma, axis=1))
-    feature_vector = np.append(feature_vector, np.mean(spectral_centroid, axis=1))
-    feature_vector = np.append(feature_vector, np.mean(spectral_rolloff, axis=1))
-    feature_vector = np.append(feature_vector, np.mean(energy, axis=1))
-    feature_vector = np.append(feature_vector, np.mean(zcr, axis=1))
-
-    return feature_vector.tolist()
-
-# --- Firestore Retrieval ---
 def fetch_songs_from_firestore():
     songs = songs_collection.stream()
     database, features = [], []
@@ -85,15 +39,13 @@ def fetch_songs_from_firestore():
             database.append(data)
     return database, features
 
-# --- Recommendation Logic ---
 def get_recommendations(upload_features, db_features, db_songs, exclude_hash=None):
-    all_features = np.vstack([upload_features] + db_features)
+    db_features = np.array(db_features)
     scaler = StandardScaler()
-    all_features_norm = scaler.fit_transform(all_features)
+    db_features_norm = scaler.fit_transform(db_features)
+    upload_norm = scaler.transform([upload_features])
 
-    upload_norm = all_features_norm[0].reshape(1, -1)
-    db_norm = all_features_norm[1:]
-    similarity_scores = cosine_similarity(upload_norm, db_norm)[0]
+    similarity_scores = cosine_similarity(upload_norm, db_features_norm)[0]
     sorted_indices = np.argsort(similarity_scores)[::-1]
 
     recommendations = []
@@ -110,7 +62,6 @@ def get_recommendations(upload_features, db_features, db_songs, exclude_hash=Non
             break
     return recommendations
 
-# --- File Upload Route ---
 @app.route("/MusicGenreDiscoverer/upload", methods=["POST"])
 def upload_file():
     log_memory("Start Upload")
@@ -157,6 +108,5 @@ def upload_file():
 
     return jsonify({"error": "Invalid file type"}), 400
 
-# --- Run App ---
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
